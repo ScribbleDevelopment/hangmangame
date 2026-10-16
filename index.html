@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Scribble Hangman</title>
+    <style>
+        :root {
+            --bg-base: #0c0c10;
+            --bg-surface: #14141a;
+            --bg-elevated: #1e1e28;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #27273a;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-container {
+            width: 90%;
+            max-width: 440px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .canvas-box {
+            width: 180px;
+            height: 160px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .word-display {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            min-height: 40px;
+            align-items: center;
+        }
+
+        .letter-box {
+            width: 32px;
+            height: 40px;
+            background: var(--bg-elevated);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .key-btn {
+            background: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 10px 0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .key-btn:hover:not(:disabled) {
+            background: var(--border);
+            transform: translateY(-1px);
+        }
+
+        .key-btn:disabled {
+            background: #0f0f13;
+            color: #475569;
+            border-color: #1a1a24;
+            cursor: not-allowed;
+        }
+
+        .status-msg {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            height: 20px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .restart-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: none;
+        }
+
+        .restart-btn:hover {
+            background: var(--accent-hover);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Scribble Hangman</h1>
+        
+        <div class="canvas-box">
+            <canvas id="hangmanCanvas" width="140" height="130"></canvas>
+        </div>
+
+        <div class="word-display" id="wordDisplay"></div>
+        
+        <div class="status-msg" id="statusMsg">Guess the secret word!</div>
+
+        <div class="keyboard" id="keyboard"></div>
+
+        <button class="restart-btn" id="restartBtn" onclick="initGame()">Play Again</button>
+    </div>
+
+<script>
+    const words = ["ROBLOX", "SCRIPT", "STUDIO", "CIRCUIT", "GAMING", "FISHING", "PIXEL", "PYTHON", "CANVAS", "VECTOR"];
+    let selectedWord = "";
+    let guessedLetters = new Set();
+    let wrongAttempts = 0;
+    const maxWrong = 6;
+
+    const canvas = document.getElementById('hangmanCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function initGame() {
+        selectedWord = words[Math.floor(Math.random() * words.length)];
+        guessedLetters.clear();
+        wrongAttempts = 0;
+        document.getElementById('statusMsg').innerText = "Guess the secret word!";
+        document.getElementById('restartBtn').style.display = 'none';
+        
+        buildKeyboard();
+        renderWord();
+        drawHangman();
+    }
+
+    function buildKeyboard() {
+        const kb = document.getElementById('keyboard');
+        kb.innerHTML = '';
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (let char of letters) {
+            const btn = document.createElement('button');
+            btn.className = 'key-btn';
+            btn.innerText = char;
+            btn.id = `key-${char}`;
+            btn.onclick = () => handleGuess(char);
+            kb.appendChild(btn);
+        }
+    }
+
+    function renderWord() {
+        const display = document.getElementById('wordDisplay');
+        display.innerHTML = '';
+        for (let char of selectedWord) {
+            const box = document.createElement('div');
+            box.className = 'letter-box';
+            box.innerText = guessedLetters.has(char) ? char : '';
+            display.appendChild(box);
+        }
+    }
+
+    function handleGuess(char) {
+        if (guessedLetters.has(char) || wrongAttempts >= maxWrong) return;
+        guessedLetters.add(char);
+        
+        const btn = document.getElementById(`key-${char}`);
+        btn.disabled = true;
+
+        if (selectedWord.includes(char)) {
+            btn.style.background = 'rgba(34, 197, 94, 0.2)';
+            btn.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+            btn.style.color = '#4ade80';
+        } else {
+            btn.style.background = 'rgba(239, 68, 68, 0.2)';
+            btn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+            btn.style.color = '#fca5a5';
+            wrongAttempts++;
+        }
+
+        renderWord();
+        drawHangman();
+        checkGameStatus();
+    }
+
+    function checkGameStatus() {
+        const won = [...selectedWord].every(char => guessedLetters.has(char));
+        const statusMsg = document.getElementById('statusMsg');
+        
+        if (won) {
+            statusMsg.innerText = "🎉 You Won! Excellent guessing!";
+            statusMsg.style.color = "#4ade80";
+            endGame();
+        } else if (wrongAttempts >= maxWrong) {
+            statusMsg.innerText = `❌ Game Over! The word was ${selectedWord}`;
+            statusMsg.style.color = "#fca5a5";
+            endGame();
+        }
+    }
+
+    function endGame() {
+        document.querySelectorAll('.key-btn').forEach(btn => btn.disabled = true);
+        document.getElementById('restartBtn').style.display = 'block';
+    }
+
+    function drawHangman() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#94a3b8';
+
+        // Post & Gallows
+        ctx.beginPath();
+        // Base
+        ctx.moveTo(20, 120); ctx.lineTo(80, 120);
+        // Vertical Pole
+        ctx.moveTo(40, 120); ctx.lineTo(40, 15);
+        // Top Beam
+        ctx.moveTo(40, 15); ctx.lineTo(100, 15);
+        // Rope
+        ctx.moveTo(100, 15); ctx.lineTo(100, 35);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#818cf8';
+
+        // 1. Head
+        if (wrongAttempts >= 1) {
+            ctx.beginPath();
+            ctx.arc(100, 48, 12, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        // 2. Body
+        if (wrongAttempts >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(100, 60); ctx.lineTo(100, 90);
+            ctx.stroke();
+        }
+        // 3. Left Arm
+        if (wrongAttempts >= 3) {
+            ctx.beginPath();
+            ctx.moveTo(100, 68); ctx.lineTo(80, 82);
+            ctx.stroke();
+        }
+        // 4. Right Arm
+        if (wrongAttempts >= 4) {
+            ctx.beginPath();
+            ctx.moveTo(100, 68); ctx.lineTo(120, 82);
+            ctx.stroke();
+        }
+        // 5. Left Leg
+        if (wrongAttempts >= 5) {
+            ctx.beginPath();
+            ctx.moveTo(100, 90); ctx.lineTo(85, 115);
+            ctx.stroke();
+        }
+        // 6. Right Leg
+        if (wrongAttempts >= 6) {
+            ctx.beginPath();
+            ctx.moveTo(100, 90); ctx.lineTo(115, 115);
+            ctx.stroke();
+        }
+    }
+
+    window.onload = initGame;
+</script>
+</body>
+</html>
