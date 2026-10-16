@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Scribble Hangman</title>
+    <title>Scribble Pass & Play Hangman</title>
     <style>
         :root {
             --bg-base: #0c0c10;
@@ -61,6 +61,42 @@
             margin-bottom: 16px;
         }
 
+        .screen {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .input-group {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .text-input {
+            width: 100%;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 16px;
+            text-align: center;
+            outline: none;
+            letter-spacing: 2px;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent);
+        }
+
         .canvas-box {
             width: 180px;
             height: 160px;
@@ -83,6 +119,8 @@
             margin-bottom: 24px;
             min-height: 40px;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .letter-box {
@@ -141,7 +179,7 @@
             text-align: center;
         }
 
-        .restart-btn {
+        .primary-btn {
             background: var(--accent);
             color: white;
             border: none;
@@ -152,10 +190,9 @@
             font-weight: 700;
             cursor: pointer;
             transition: background 0.2s;
-            display: none;
         }
 
-        .restart-btn:hover {
+        .primary-btn:hover {
             background: var(--accent-hover);
         }
     </style>
@@ -163,24 +200,35 @@
 <body>
 
     <div class="game-container">
-        <h1>Scribble Hangman</h1>
-        
-        <div class="canvas-box">
-            <canvas id="hangmanCanvas" width="140" height="130"></canvas>
+        <h1>Scribble Pass & Play</h1>
+
+        <!-- Setup Screen (Player 1) -->
+        <div id="setupScreen" class="screen">
+            <div class="status-msg" style="margin-top: 10px;">Player 1: Enter a secret word for Player 2</div>
+            <div class="input-group">
+                <input type="password" id="secretInput" class="text-input" placeholder="Secret Word" maxlength="12" autocomplete="off">
+            </div>
+            <button class="primary-btn" onclick="startPlay()">Start Guessing Round</button>
         </div>
 
-        <div class="word-display" id="wordDisplay"></div>
-        
-        <div class="status-msg" id="statusMsg">Guess the secret word!</div>
+        <!-- Gameplay Screen (Player 2) -->
+        <div id="gameScreen" class="screen hidden">
+            <div class="canvas-box">
+                <canvas id="hangmanCanvas" width="140" height="130"></canvas>
+            </div>
 
-        <div class="keyboard" id="keyboard"></div>
+            <div class="word-display" id="wordDisplay"></div>
+            
+            <div class="status-msg" id="statusMsg">Player 2: Guess the word!</div>
 
-        <button class="restart-btn" id="restartBtn" onclick="initGame()">Play Again</button>
+            <div class="keyboard" id="keyboard"></div>
+
+            <button class="primary-btn hidden" id="restartBtn" onclick="resetToSetup()">New Round</button>
+        </div>
     </div>
 
 <script>
-    const words = ["ROBLOX", "SCRIPT", "STUDIO", "CIRCUIT", "GAMING", "FISHING", "PIXEL", "PYTHON", "CANVAS", "VECTOR"];
-    let selectedWord = "";
+    let secretWord = "";
     let guessedLetters = new Set();
     let wrongAttempts = 0;
     const maxWrong = 6;
@@ -188,16 +236,34 @@
     const canvas = document.getElementById('hangmanCanvas');
     const ctx = canvas.getContext('2d');
 
-    function initGame() {
-        selectedWord = words[Math.floor(Math.random() * words.length)];
+    function startPlay() {
+        const input = document.getElementById('secretInput');
+        const word = input.value.trim().toUpperCase();
+        
+        if (!word || !/^[A-Z]+$/.test(word)) {
+            alert("Please enter a valid word using only letters!");
+            return;
+        }
+
+        secretWord = word;
+        input.value = "";
         guessedLetters.clear();
         wrongAttempts = 0;
-        document.getElementById('statusMsg').innerText = "Guess the secret word!";
-        document.getElementById('restartBtn').style.display = 'none';
-        
+
+        document.getElementById('setupScreen').classList.add('hidden');
+        document.getElementById('gameScreen').classList.remove('hidden');
+        document.getElementById('statusMsg').innerText = "Player 2: Guess the word!";
+        document.getElementById('statusMsg').style.color = "var(--text-muted)";
+        document.getElementById('restartBtn').classList.add('hidden');
+
         buildKeyboard();
         renderWord();
         drawHangman();
+    }
+
+    function resetToSetup() {
+        document.getElementById('gameScreen').classList.add('hidden');
+        document.getElementById('setupScreen').classList.remove('hidden');
     }
 
     function buildKeyboard() {
@@ -217,7 +283,7 @@
     function renderWord() {
         const display = document.getElementById('wordDisplay');
         display.innerHTML = '';
-        for (let char of selectedWord) {
+        for (let char of secretWord) {
             const box = document.createElement('div');
             box.className = 'letter-box';
             box.innerText = guessedLetters.has(char) ? char : '';
@@ -232,7 +298,7 @@
         const btn = document.getElementById(`key-${char}`);
         btn.disabled = true;
 
-        if (selectedWord.includes(char)) {
+        if (secretWord.includes(char)) {
             btn.style.background = 'rgba(34, 197, 94, 0.2)';
             btn.style.borderColor = 'rgba(34, 197, 94, 0.5)';
             btn.style.color = '#4ade80';
@@ -249,15 +315,15 @@
     }
 
     function checkGameStatus() {
-        const won = [...selectedWord].every(char => guessedLetters.has(char));
+        const won = [...secretWord].every(char => guessedLetters.has(char));
         const statusMsg = document.getElementById('statusMsg');
         
         if (won) {
-            statusMsg.innerText = "🎉 You Won! Excellent guessing!";
+            statusMsg.innerText = "🎉 Player 2 Won!";
             statusMsg.style.color = "#4ade80";
             endGame();
         } else if (wrongAttempts >= maxWrong) {
-            statusMsg.innerText = `❌ Game Over! The word was ${selectedWord}`;
+            statusMsg.innerText = `❌ Game Over! Word was: ${secretWord}`;
             statusMsg.style.color = "#fca5a5";
             endGame();
         }
@@ -265,7 +331,7 @@
 
     function endGame() {
         document.querySelectorAll('.key-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('restartBtn').style.display = 'block';
+        document.getElementById('restartBtn').classList.remove('hidden');
     }
 
     function drawHangman() {
@@ -276,13 +342,9 @@
 
         // Post & Gallows
         ctx.beginPath();
-        // Base
         ctx.moveTo(20, 120); ctx.lineTo(80, 120);
-        // Vertical Pole
         ctx.moveTo(40, 120); ctx.lineTo(40, 15);
-        // Top Beam
         ctx.moveTo(40, 15); ctx.lineTo(100, 15);
-        // Rope
         ctx.moveTo(100, 15); ctx.lineTo(100, 35);
         ctx.stroke();
 
@@ -325,8 +387,6 @@
             ctx.stroke();
         }
     }
-
-    window.onload = initGame;
 </script>
 </body>
 </html>
